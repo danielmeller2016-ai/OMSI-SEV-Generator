@@ -1,0 +1,35 @@
+name: SEV V3.5
+on:
+  push:
+    paths:
+      - .github/workflows/v35.yml
+      - updates/patch35.py
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - shell: pwsh
+        run: |
+          Expand-Archive SEV_V3_3_Quellcode.zip -DestinationPath src35 -Force
+          Copy-Item updates/AutoUpdate.cs src35/
+          python updates/patch35.py
+          if ($LASTEXITCODE -ne 0) { throw 'Patch failed' }
+          dotnet publish src35/SEV.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SEV35
+          path: publish/
+      - shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v3.5.0 publish/OMSI-SEV-Generator.exe --title 'OMSI SEV Generator 3.5' --notes 'SEV-Symbol, Logo-Schalter, gruppierte Einstellungen, automatische Folgeupdates.' --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Release failed' }
