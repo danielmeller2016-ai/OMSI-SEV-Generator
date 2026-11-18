@@ -1,0 +1,32 @@
+name: SEV Release aus Quellcode
+on:
+  push:
+    paths:
+      - SEV_V3_3_Quellcode.zip
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - shell: pwsh
+        run: |
+          Expand-Archive SEV_V3_3_Quellcode.zip -DestinationPath src-release -Force
+          dotnet publish src-release/SEV.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+          if ($LASTEXITCODE -ne 0) { throw 'Build fehlgeschlagen' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SEV-3.3-Windows
+          path: publish/
+      - shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Compress-Archive -Path publish/* -DestinationPath OMSI-SEV-Generator-3.3-Windows.zip
+          gh release create v3.3.0 OMSI-SEV-Generator-3.3-Windows.zip --draft --title "OMSI SEV Generator 3.3" --notes "Windows-Version mit bisheriger Oberfläche; vor Freigabe praktisch testen."
+          if ($LASTEXITCODE -ne 0) { throw 'Release fehlgeschlagen' }
